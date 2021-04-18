@@ -1,4 +1,5 @@
 from typing import List
+import hashlib
 import json
 import re
 from urllib.parse import urlencode, urlparse, urlunparse
@@ -12,7 +13,7 @@ import pprint
 
 class BingeObject:
     def serialize(self, as_dict=False) -> str:
-        serial_dict = {'id': str(id(self))}
+        serial_dict = {}
         for k, v in self.__dict__.items():
             if isinstance(v, list) and len(v) > 0 and isinstance(v[0], BingeObject):
                 serial_dict[k] = list(map(lambda x: x.serialize(as_dict=True), v))
@@ -26,7 +27,8 @@ class BingeObject:
 
 
 class Trivia(BingeObject):
-    def __init__(self, text: str):
+    def __init__(self, trivia_id: str, text: str):
+        self.trivia_id = trivia_id
         self.score = -1
         self.score_denominator = 1
         self.text = text
@@ -34,14 +36,16 @@ class Trivia(BingeObject):
 
 
 class Episode(BingeObject):
-    def __init__(self, name: str, season: int):
+    def __init__(self, episode_id, name: str, season: int):
+        self.episode_id = episode_id
         self.name = name
         self.season = season
         self.trivia_set = []
 
 
 class Series(BingeObject):
-    def __init__(self, name: str):
+    def __init__(self, series_id: str, name: str):
+        self.series_id = series_id
         self.name = name
         self.season_count = -1
         self.thumbnail_url = None
@@ -67,13 +71,12 @@ class IMDBSeleniumScraper:
         self.default_browser.get(url)
         title_section = self.default_browser.find_element_by_xpath('//div[@class="findSection"]/h3/a[@name="tt"]/../..')
         episode_element = title_section.find_elements_by_xpath('//tr/td[@class="result_text"]/a')[0]
-        series = Series(episode_element.text)
         show_url = episode_element.get_attribute('href')
         series.imdb_id = re.findall(r'(?<=title\/)tt.+(?=\/\?ref)', show_url)[0]
         if 'title/tt' in show_url:
             thumb_links = episode_element.find_elements_by_xpath('../..//td[@class="primary_photo"]/a/img')
             series.thumbnail_url = thumb_links[0].get_attribute('src') if thumb_links else None
-        season_link = f'http://www.imdb.com/title/{series.imdb_id}/episodes'
+        season_link = f'http://www.imdb.com/title/{series.series_id}/episodes'
         self.default_browser.get(season_link)
         series.season_count = len(self.default_browser.find_elements_by_xpath('//select[@id="bySeason"]/option'))
         for season in range(1, series.season_count+1):
@@ -85,11 +88,12 @@ class IMDBSeleniumScraper:
                 new_ep.imdb_id = ep_id
                 series.episode_set.append(new_ep)
             for e in series.episode_set:
-                self.default_browser.get(f'https://www.imdb.com/title/{e.imdb_id}/trivia')
+                self.default_browser.get(f'https://www.imdb.com/title/{e.episode_id}/trivia')
                 trivia_divs = self.default_browser.find_elements_by_xpath('//div[contains(@id,"tr")]'
                                                                           '/div[@class="sodatext"]')
                 for trivia_div in trivia_divs:
-                    tr = Trivia(trivia_div.text)
+                    trivia_id = hashlib.md5(trivia_div.text.encode('utf-8')).hexdigest()
+                    tr = Trivia(trivia_id, trivia_div.text)
                     score_div = trivia_div.find_element_by_xpath('../div[@class="did-you-know-actions"]/a')
                     tr.score = int(re.findall('^[0-9]+', score_div.text)[0])
                     tr.score_denominator = int(re.findall('(?<=of )[0-9]+', score_div.text)[0])
