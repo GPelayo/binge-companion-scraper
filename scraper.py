@@ -72,7 +72,8 @@ class IMDBSeleniumScraper:
         title_section = self.default_browser.find_element_by_xpath('//div[@class="findSection"]/h3/a[@name="tt"]/../..')
         episode_element = title_section.find_elements_by_xpath('//tr/td[@class="result_text"]/a')[0]
         show_url = episode_element.get_attribute('href')
-        series.imdb_id = re.findall(r'(?<=title\/)tt.+(?=\/\?ref)', show_url)[0]
+        series_id = re.findall(r'(?<=title/)tt.+(?=/\?ref)', show_url)[0]
+        series = Series(series_id, episode_element.text)
         if 'title/tt' in show_url:
             thumb_links = episode_element.find_elements_by_xpath('../..//td[@class="primary_photo"]/a/img')
             series.thumbnail_url = thumb_links[0].get_attribute('src') if thumb_links else None
@@ -83,9 +84,8 @@ class IMDBSeleniumScraper:
             self.default_browser.get(season_link + f'?season={season}')
             for ep_element in self.default_browser.find_elements_by_xpath('//strong/a[@itemprop="name"]'):
                 ep_url = ep_element.get_attribute('href')
-                ep_id = re.findall(r'(?<=title\/)tt.+(?=\/\?ref)', ep_url)[0]
-                new_ep = Episode(ep_element.text, season)
-                new_ep.imdb_id = ep_id
+                ep_id = re.findall(r'(?<=title/)tt.+(?=/\?ref)', ep_url)[0]
+                new_ep = Episode(ep_id, ep_element.text, season)
                 series.episode_set.append(new_ep)
             for e in series.episode_set:
                 self.default_browser.get(f'https://www.imdb.com/title/{e.episode_id}/trivia')
@@ -95,9 +95,12 @@ class IMDBSeleniumScraper:
                     trivia_id = hashlib.md5(trivia_div.text.encode('utf-8')).hexdigest()
                     tr = Trivia(trivia_id, trivia_div.text)
                     score_div = trivia_div.find_element_by_xpath('../div[@class="did-you-know-actions"]/a')
-                    tr.score = int(re.findall('^[0-9]+', score_div.text)[0])
-                    tr.score_denominator = int(re.findall('(?<=of )[0-9]+', score_div.text)[0])
+                    score_str = re.findall('^[0-9]+', score_div.text)
+                    if score_str:
+                        tr.score = int(score_str[0]) if int(score_str[0]) > 0 else 1
+                        tr.score_denominator = int(re.findall('(?<=of )[0-9]+', score_div.text)[0])
+                    tr.score = tr.score if tr.score > 0 else 1
+                    tr.score_denominator = tr.score_denominator if tr.score_denominator > 0 else 100
                     e.trivia_set.append(tr)
-                break
         self.default_browser.close()
         return series
