@@ -6,9 +6,8 @@ from urllib.parse import urlencode, urlparse, urlunparse
 
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.remote.webdriver import WebDriver
-import settings
 
-import pprint
+import settings
 
 
 class BingeObject:
@@ -19,11 +18,8 @@ class BingeObject:
                 serial_dict[k] = list(map(lambda x: x.serialize(as_dict=True), v))
             else:
                 serial_dict[k] = v
-        pprint.pprint(serial_dict)
-        if as_dict:
-            return serial_dict
-        else:
-            return json.dumps(serial_dict)
+
+        return serial_dict if as_dict else json.dumps(serial_dict)
 
 
 class Trivia(BingeObject):
