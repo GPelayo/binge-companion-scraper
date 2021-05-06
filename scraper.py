@@ -89,7 +89,6 @@ class IMDBSeleniumScraper:
                 ep_trivia = self.extract_trivia_page(f'https://www.imdb.com/title/{e.episode_id}/trivia')
                 series.trivia_set += ep_trivia
                 e.trivia_set = ep_trivia
-        self.default_browser.close()
         return series
 
     def extract_trivia_page(self, url: str) -> List[Trivia]:
@@ -108,3 +107,6 @@ class IMDBSeleniumScraper:
             tr.score_denominator = tr.score_denominator if tr.score_denominator > 0 else 100
             trivia_set.append(tr)
         return trivia_set
+
+    def __del__(self):
+        self.default_browser.close()
