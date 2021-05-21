@@ -6,8 +6,10 @@ from urllib.parse import urlencode, urlparse, urlunparse
 
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.common.exceptions import NoSuchElementException
 
 import settings
+from exceptions import NoResultsException
 
 
 class BingeObject:
@@ -66,7 +68,12 @@ class IMDBSeleniumScraper:
         url_pieces[4] = urlencode({'q': title})
         url = urlunparse(url_pieces)
         self.default_browser.get(url)
-        title_section = self.default_browser.find_element_by_xpath('//div[@class="findSection"]/h3/a[@name="tt"]/../..')
+
+        try:
+            title_section = self.default_browser.find_element_by_xpath('//div[@class="findSection"]/h3/a[@name="tt"]/../..')
+        except NoSuchElementException:
+            raise NoResultsException(f'{title} has no results in IMDB')
+
         episode_element = title_section.find_elements_by_xpath('//tr/td[@class="result_text"]/a')[0]
         show_url = episode_element.get_attribute('href')
         series_id = re.findall(r'(?<=title/)tt.+(?=/\?ref)', show_url)[0]
