@@ -116,4 +116,5 @@ class IMDBSeleniumScraper:
         return trivia_set
 
     def __del__(self):
-        self.default_browser.close()
+        if self.default_browser:
+            self.default_browser.close()
