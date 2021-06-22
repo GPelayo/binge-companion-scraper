@@ -110,7 +110,7 @@ class IMDBSeleniumScraper:
             if score_str:
                 tr.score = int(score_str[0]) if int(score_str[0]) > 0 else 1
                 tr.score_denominator = int(re.findall('(?<=of )[0-9]+', score_div.text)[0])
-            tr.score = tr.score if tr.score > 0 else 1
+                tr.score = tr.score if tr.score >= 0 else 0
             tr.score_denominator = tr.score_denominator if tr.score_denominator > 0 else 100
             trivia_set.append(tr)
         return trivia_set
