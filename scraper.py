@@ -4,13 +4,10 @@ import json
 import re
 from urllib.parse import urlencode, urlparse, urlunparse
 
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.common.exceptions import NoSuchElementException
 
-import settings
 from exceptions import NoResultsException
-
+from webdriver import ChromeWebDriverFactory
 
 class BingeObject:
     def serialize(self, as_dict=False) -> str:
@@ -55,22 +52,18 @@ class Series(BingeObject):
 
 
 class IMDBSeleniumScraper:
-    driver_type = settings.SELENIUM_WEBDRIVER_TYPE
-
-    def __init__(self, browser: WebDriver = None, will_get_trivia: bool = True):
-        options = Options()
-        options.headless = True
-        self.default_browser = browser or self.driver_type(options=options, executable_path=settings.WEBDRIVER_PATH)
+    def __init__(self, will_get_trivia: bool = True):
+        self.browser = ChromeWebDriverFactory().get_webdriver()
         self.will_get_trivia = will_get_trivia
 
     def search_media(self, title: str) -> Series:
         url_pieces = list(urlparse('http://www.imdb.com/find'))
         url_pieces[4] = urlencode({'q': title})
         url = urlunparse(url_pieces)
-        self.default_browser.get(url)
+        self.browser.get(url)
 
         try:
-            title_section = self.default_browser.find_element_by_xpath('//div[@class="findSection"]/h3/a[@name="tt"]/../..')
+            title_section = self.browser.find_element_by_xpath('//div[@class="findSection"]/h3/a[@name="tt"]/../..')
         except NoSuchElementException:
             raise NoResultsException(f'{title} has no results in IMDB')
 
@@ -83,11 +76,11 @@ class IMDBSeleniumScraper:
             series.thumbnail_url = thumb_links[0].get_attribute('src') if thumb_links else None
         season_link = f'http://www.imdb.com/title/{series.series_id}/episodes'
         series.trivia_set += self.extract_trivia_page(f'https://www.imdb.com/title/{series.series_id}/trivia')
-        self.default_browser.get(season_link)
-        series.season_count = len(self.default_browser.find_elements_by_xpath('//select[@id="bySeason"]/option'))
+        self.browser.get(season_link)
+        series.season_count = len(self.browser.find_elements_by_xpath('//select[@id="bySeason"]/option'))
         for season in range(1, series.season_count+1):
-            self.default_browser.get(season_link + f'?season={season}')
-            for ep_element in self.default_browser.find_elements_by_xpath('//strong/a[@itemprop="name"]'):
+            self.browser.get(season_link + f'?season={season}')
+            for ep_element in self.browser.find_elements_by_xpath('//strong/a[@itemprop="name"]'):
                 ep_url = ep_element.get_attribute('href')
                 ep_id = re.findall(r'(?<=title/)tt.+(?=/\?ref)', ep_url)[0]
                 new_ep = Episode(ep_id, ep_element.text, season)
@@ -100,8 +93,8 @@ class IMDBSeleniumScraper:
 
     def extract_trivia_page(self, url: str) -> List[Trivia]:
         trivia_set = []
-        self.default_browser.get(url)
-        trivia_divs = self.default_browser.find_elements_by_xpath('//div[contains(@id,"tr")]/div[@class="sodatext"]')
+        self.browser.get(url)
+        trivia_divs = self.browser.find_elements_by_xpath('//div[contains(@id,"tr")]/div[@class="sodatext"]')
         for trivia_div in trivia_divs:
             trivia_id = hashlib.md5((trivia_div.text+url).encode('utf-8')).hexdigest()
             tr = Trivia(trivia_id, trivia_div.text)
@@ -113,7 +106,3 @@ class IMDBSeleniumScraper:
             tr.score_denominator, tr.score = tr.score_denominator, tr.score if tr.score_denominator > 0 else (0, 1)
             trivia_set.append(tr)
         return trivia_set
-
-    def __del__(self):
-        if self.default_browser:
-            self.default_browser.close()
