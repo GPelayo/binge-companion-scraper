@@ -53,8 +53,18 @@ class Series(BingeObject):
 
 class IMDBSeleniumScraper:
     def __init__(self, will_get_trivia: bool = True):
-        self.browser = ChromeWebDriverFactory().get_webdriver()
+        self.browser = None
         self.will_get_trivia = will_get_trivia
+
+    def __enter__(self):
+        self.browser = ChromeWebDriverFactory().get_webdriver()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.browser.close()
+
+    def open_browser(self):
+        self.browser = ChromeWebDriverFactory().get_webdriver()
 
     def search_media(self, title: str) -> Series:
         url_pieces = list(urlparse('http://www.imdb.com/find'))
@@ -106,3 +116,6 @@ class IMDBSeleniumScraper:
             tr.score_denominator, tr.score = tr.score_denominator, tr.score if tr.score_denominator > 0 else (0, 1)
             trivia_set.append(tr)
         return trivia_set
+
+    def close_browser(self):
+        self.browser.close()
