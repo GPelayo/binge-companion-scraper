@@ -48,9 +48,7 @@ class IMDBSeleniumScraper:
 
     def scrape_series_page(self, series):
         season_link = f'http://www.imdb.com/title/{series.series_id}/episodes'
-        series.series_trivia += self.extract_trivia_page(series.series_id,
-                                                         f'https://www.imdb.com/title/{series.series_id}/trivia')
-
+        trivia_ids = set()
         self.browser.get(season_link)
         series.season_count = len(self.browser.find_elements(By.XPATH, '//select[@id="bySeason"]/option'))
         for season in range(1, series.season_count+1):
@@ -71,6 +69,7 @@ class IMDBSeleniumScraper:
         trivia_list = []
         self.browser.get(url)
         trivia_divs = self.browser.find_elements(By.XPATH, '//div[contains(@id,"tr")]/div[@class="sodatext"]')
+        trivia_divs = filter(lambda x: x.text != '', trivia_divs)
         for trivia_div in trivia_divs:
             trivia_id = hashlib.md5((trivia_div.text+url).encode('utf-8')).hexdigest()
             tr = Trivia(trivia_id, trivia_div.text, series_id)
