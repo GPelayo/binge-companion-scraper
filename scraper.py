@@ -3,6 +3,7 @@ import hashlib
 import logging
 import re
 from urllib.parse import urlencode, urlparse, urlunparse
+import sys
 
 from binge_models.models import Series, Episode, Trivia
 from selenium.webdriver.common.by import By
@@ -18,8 +19,9 @@ log.addHandler(logging.StreamHandler())
 
 
 class IMDBSeleniumScraper:
-    def __init__(self, will_get_trivia: bool = True):
+    def __init__(self, will_get_trivia: bool = True, max_seasons: int = sys.maxsize):
         self.browser = None
+        self.max_seasons = max_seasons
         self.will_get_trivia = will_get_trivia
 
     def __enter__(self):
@@ -59,7 +61,8 @@ class IMDBSeleniumScraper:
         trivia_ids = set()
         self.browser.get(season_link)
         series.season_count = len(self.browser.find_elements(By.XPATH, '//select[@id="bySeason"]/option'))
-        for season in range(1, series.season_count+1):
+        season_count = min(series.season_count, self.max_seasons)
+        for season in range(1, season_count+1):
             self.browser.get(season_link + f'?season={season}')
             log.info(f'Scraping Season {season}')
             for ep_element in self.browser.find_elements(By.XPATH, '//strong/a[@itemprop="name"]'):
