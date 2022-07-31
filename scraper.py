@@ -1,5 +1,6 @@
 from typing import List
 import hashlib
+import logging
 import re
 from urllib.parse import urlencode, urlparse, urlunparse
 
@@ -9,6 +10,11 @@ from selenium.common.exceptions import NoSuchElementException
 
 from exceptions import NoResultsException
 from webdriver import ChromeWebDriverFactory
+
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
+log.addHandler(logging.StreamHandler())
 
 
 class IMDBSeleniumScraper:
@@ -27,6 +33,7 @@ class IMDBSeleniumScraper:
         self.browser = ChromeWebDriverFactory().get_webdriver()
 
     def search_media(self, title: str) -> Series:
+        log.info(f'Searching for {title} in IMDB...')
         url_pieces = list(urlparse('http://www.imdb.com/find'))
         url_pieces[4] = urlencode({'q': title})
         url = urlunparse(url_pieces)
@@ -44,6 +51,7 @@ class IMDBSeleniumScraper:
         if 'title/tt' in show_url:
             thumb_links = show_result_element.find_elements(By.XPATH, '../..//td[@class="primary_photo"]/a/img')
             series.thumbnail_url = thumb_links[0].get_attribute('src') if thumb_links else None
+        log.info(f'Found {series.name} ({show_url}). Scraping series...')
         return series
 
     def scrape_series_page(self, series):
@@ -53,12 +61,14 @@ class IMDBSeleniumScraper:
         series.season_count = len(self.browser.find_elements(By.XPATH, '//select[@id="bySeason"]/option'))
         for season in range(1, series.season_count+1):
             self.browser.get(season_link + f'?season={season}')
+            log.info(f'Scraping Season {season}')
             for ep_element in self.browser.find_elements(By.XPATH, '//strong/a[@itemprop="name"]'):
                 ep_url = ep_element.get_attribute('href')
                 ep_id = re.findall(r'(?<=title/)tt.+(?=/\?ref)', ep_url)[0]
                 new_ep = Episode(ep_id, ep_element.text, season, series.series_id)
                 series.episodes.append(new_ep)
             for e in series.episodes:
+                log.info(f'Scraping Trivia for Episode: {e.name}')
                 ep_trivia = self.extract_trivia_page(series.series_id,
                                                      f'https://www.imdb.com/title/{e.episode_id}/trivia',
                                                      trivia_id_filter=trivia_ids)
