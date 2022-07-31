@@ -60,18 +60,29 @@ class IMDBSeleniumScraper:
                 series.episodes.append(new_ep)
             for e in series.episodes:
                 ep_trivia = self.extract_trivia_page(series.series_id,
-                                                     f'https://www.imdb.com/title/{e.episode_id}/trivia')
-                series.series_trivia += ep_trivia
+                                                     f'https://www.imdb.com/title/{e.episode_id}/trivia',
+                                                     trivia_id_filter=trivia_ids)
+                for t in ep_trivia:
+                    trivia_ids.add(t.trivia_id)
                 e.trivia_list = ep_trivia
+        series.series_trivia += self.extract_trivia_page(series.series_id,
+                                                         f'https://www.imdb.com/title/{series.series_id}/trivia',
+                                                         trivia_id_filter=trivia_ids)
+
         return series
 
-    def extract_trivia_page(self, series_id: str, url: str) -> List[Trivia]:
+    def extract_trivia_page(self, series_id: str, url: str, trivia_id_filter: set = None) -> List[Trivia]:
         trivia_list = []
+        trivia_id_filter = trivia_id_filter or set()
         self.browser.get(url)
         trivia_divs = self.browser.find_elements(By.XPATH, '//div[contains(@id,"tr")]/div[@class="sodatext"]')
         trivia_divs = filter(lambda x: x.text != '', trivia_divs)
         for trivia_div in trivia_divs:
             trivia_id = hashlib.md5((trivia_div.text+url).encode('utf-8')).hexdigest()
+            if trivia_id in trivia_id_filter:
+                continue
+            else:
+                trivia_id_filter.add(trivia_id)
             tr = Trivia(trivia_id, trivia_div.text, series_id)
             score_div = trivia_div.find_element_by_xpath('../div[@class="did-you-know-actions"]/a')
             score_str = re.findall('^[0-9]+', score_div.text)
